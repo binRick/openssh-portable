@@ -7,8 +7,9 @@ set -e
 if [ ! -e libjwt.so.0 ]; then
     JWTPATH=~/.libjwt
     rm -rf $JWTPATH
-    git clone https://github.com/benmcollins/libjwt $JWTPATH
+    git clone ssh://git@github.com/benmcollins/libjwt $JWTPATH
     cd $JWTPATH
+    sudo yum -y install openssl-devel
     autoreconf -vi
     ./configure
     make
