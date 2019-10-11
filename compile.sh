@@ -3,13 +3,14 @@ cd $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 origDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 set -e
 
+sudo yum -y install openssl-devel jansson-devel mariadb-server
+
 #  LIBJWT
 if [ ! -e libjwt.so.0 ]; then
     JWTPATH=~/.libjwt
     rm -rf $JWTPATH
     git clone ssh://git@github.com/benmcollins/libjwt $JWTPATH
     cd $JWTPATH
-    sudo yum -y install openssl-devel
     autoreconf -vi
     ./configure
     make
