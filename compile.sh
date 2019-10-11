@@ -19,6 +19,7 @@ if [ ! -e libjwt.so.0 ]; then
     #cp ./libjwt/.libs/libjwt.a $origDir/.
     cp ./libjwt/.libs/libjwt.so $origDir/.
     cp ./libjwt/.libs/libjwt.so.0 $origDir/.
+    cp ./include/jwt.h $origDir/.
 
     cd $origDir
 fi
