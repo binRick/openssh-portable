@@ -94,10 +94,24 @@
 # define DEFAULT_PKCS11_WHITELIST "/usr/lib*/*,/usr/local/lib*/*"
 #endif
 
+#include <sys/prctl.h>
+#define PR_SET_PTRACER 0x59616d61
+#define _LINUX_SOURCE_COMPAT
+#include <sys/ptrace.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <unistd.h>
+
+
+
 /* Maximum accepted message length */
 #define AGENT_MAX_LEN	(256*1024)
 /* Maximum bytes to read from client socket */
 #define AGENT_RBUF_LEN	(4096)
+
+#include <jwt.h>
 
 typedef enum {
 	AUTH_UNUSED,
@@ -781,6 +795,8 @@ process_message(u_int socknum)
 static void
 new_socket(sock_type type, int fd)
 {
+
+
 	u_int i, old_alloc, new_alloc;
 
 	set_nonblock(fd);
@@ -816,9 +832,226 @@ new_socket(sock_type type, int fd)
 	sockets[old_alloc].type = type;
 }
 
+#if !defined(PT_ATTACHEXC) /* New replacement for PT_ATTACH */
+   #if !defined(PTRACE_ATTACH) && defined(PT_ATTACH)
+       #define PT_ATTACHEXC    PT_ATTACH
+   #elif defined(PTRACE_ATTACH)
+       #define PT_ATTACHEXC PTRACE_ATTACH
+   #endif
+#endif
+
+
+void untraceable(){
+//    prctl(PR_SET_DUMPABLE, 0);
+//    prctl(PR_SET_PTRACER, -1);
+
+        //if (ptrace(PTRACE_TRACEME, 0, 0, 0) < 0) {
+        //    kill(getpid(), SIGKILL);
+        //    _exit(1);
+        //}
+
+   //if(getuid()!=0){
+   //     printf("Running as uid %d, cannot enforce untraceable\n", getuid());
+   //     return;
+   //}
+   char proc[80];
+   int pid, mine;
+   switch(pid = fork()) {
+   case  0:
+       pid = getppid();
+       sprintf(proc, "/proc/%d/as", (int)pid);
+       close(0);
+       mine = !open(proc, O_RDWR|O_EXCL);
+       if (!mine && errno != EBUSY)
+           mine = !ptrace(PT_ATTACHEXC, pid, 0, 0);
+       if (mine) {
+           kill(pid, SIGCONT);
+       } else {
+           fprintf(stderr, "%d is being traced!\n", (int)pid);
+           kill(pid, SIGKILL);
+       }
+       _exit(mine);
+   case -1:
+       break;
+   default:
+       if (pid == waitpid(pid, 0, 0))
+           return;
+   }
+   _exit(1);
+}
+
+
+
+static int VALIDATE_ENVIRONMENT_TOKEN(long PID, char * name_){
+    char *PUBLIC_KEY_ENCODED;
+    char PID_ENV_PATH[256];
+    char READ_PID_ENV_CMD[256];
+    char *PUBLIC_KEY_DECODED, *VALID_ISSUER_ENCODED, *VALID_ISSUER_DECODED, *TOKEN_ISSUER;
+    char *AUTH_TOKEN;
+    char LOCAL_HOSTNAME[128];
+    int PUBLIC_KEY_ENCODED_LENGTH, PUBLIC_KEY_DECODED_LENGTH, AUTH_TOKEN_LENGTH, VALID_ISSUER_DECODED_LENGTH, VALID_ISSUER_ENCODED_LENGTH;
+    int VALID_ISSUER_DECODE_RESULT, AUTH_TOKEN_DECODE_RESULT, PUBLIC_KEY_DECODE_RESULT;
+    jwt_t *AUTH_TOKEN_JWT_OBJECT;
+    time_t now;
+    time_t exp;
+    time_t TOKEN_EXPIRES_TIMESTAMP, CURRENT_TIMESTAMP;
+    int VALIDATIONS_EXPIRED = 1, VALIDATIONS_ISSUER = 1, EXPIRES_SECONDS_REMAINING = 0;
+	size_t len;
+    CURRENT_TIMESTAMP = time(NULL);
+
+
+    ////////////////////////////////
+    //     Get Local Hostname     //
+    ////////////////////////////////
+    gethostname(LOCAL_HOSTNAME, sizeof(LOCAL_HOSTNAME));
+    printf("[ssh-agent server] LOCAL_HOSTNAME (%d bytes): %s\n", (int)strlen(LOCAL_HOSTNAME), LOCAL_HOSTNAME);
+
+
+    ////////////////////////////////
+    //     Get Valid Issuer       //
+    ////////////////////////////////
+    VALID_ISSUER_ENCODED = getenv("ISSUER");
+    if(VALID_ISSUER_ENCODED == NULL){
+        printf("[ssh-agent server] FAILED :: ISSUER env var not found\n");
+        return 1;
+    }
+    printf("[ssh-agent server] VALID_ISSUER_ENCODED (%d bytes): %s\n", strlen(VALID_ISSUER_ENCODED), VALID_ISSUER_ENCODED);
+    VALID_ISSUER_ENCODED_LENGTH = (int)strlen(VALID_ISSUER_ENCODED);
+    VALID_ISSUER_DECODED = alloca(VALID_ISSUER_ENCODED_LENGTH * 2);
+    VALID_ISSUER_DECODE_RESULT = jwt_Base64decode(VALID_ISSUER_DECODED, VALID_ISSUER_ENCODED);
+    VALID_ISSUER_DECODED_LENGTH = (int)strlen(VALID_ISSUER_DECODED);
+    printf("[ssh-agent server] VALID_ISSUER_DECODED (%d bytes): %s\n", VALID_ISSUER_DECODED_LENGTH, VALID_ISSUER_DECODED);
+
+
+    ////////////////////////////////
+    //     Get Valid Public Key   //
+    ////////////////////////////////
+    PUBLIC_KEY_ENCODED = getenv("PUBLIC_KEY");
+    if(PUBLIC_KEY_ENCODED == NULL){
+        printf("[ssh-agent server] FAILED :: PUBLIC_KEY env var not found\n");
+        return 1;
+    }
+    PUBLIC_KEY_ENCODED_LENGTH = (int)strlen(PUBLIC_KEY_ENCODED);
+    if(PUBLIC_KEY_ENCODED_LENGTH < 32){
+        printf("[ssh-agent server] FAILED :: PUBLIC_KEY env var not valid (%d bytes)\n", PUBLIC_KEY_ENCODED_LENGTH);
+        return 1;
+    }
+    printf("[ssh-agent server] PUBLIC_KEY_ENCODED (%d bytes): %s\n", PUBLIC_KEY_ENCODED_LENGTH, PUBLIC_KEY_ENCODED);
+
+
+
+
+    ////////////////////////////////
+    //  Decode Valid Public Key   //
+    ////////////////////////////////
+    PUBLIC_KEY_DECODED = alloca(PUBLIC_KEY_ENCODED_LENGTH * 2);
+    PUBLIC_KEY_DECODE_RESULT = jwt_Base64decode(PUBLIC_KEY_DECODED, PUBLIC_KEY_ENCODED);
+    PUBLIC_KEY_DECODED_LENGTH = (int)strlen(PUBLIC_KEY_DECODED);
+    if(PUBLIC_KEY_DECODED_LENGTH < 32){
+        printf("[ssh-agent server] FAILED :: Decoded PUBLIC_KEY not value (%d bytes)\n", PUBLIC_KEY_DECODED_LENGTH);
+        return 1;
+    }
+    printf("[ssh-agent server] PUBLIC_KEY_DECODED (%d bytes): %s\n", PUBLIC_KEY_DECODED_LENGTH, PUBLIC_KEY_DECODED);
+
+
+    ////////////////////////////////
+    //  Read Client Process Env   //
+    ////////////////////////////////
+    sprintf(PID_ENV_PATH, "/proc/%ld/environ", PID);
+    printf("[ssh-agent server] Validating PID=%ld PID_ENV_PATH=%s\n", PID, PID_ENV_PATH);
+    sprintf(READ_PID_ENV_CMD, "cat /proc/%ld/environ|tr '\\000' '\\n'|grep '%s='", PID, name_);
+    FILE *cmd=popen(READ_PID_ENV_CMD, "r");
+    char result[5000]={0x0};
+    while (fgets(result, sizeof(result), cmd) !=NULL){
+           AUTH_TOKEN = strtok(result, "="); 
+           if(AUTH_TOKEN == NULL){ 
+                pclose(cmd);
+                printf("[ssh-agent server] FAILED :: \"%s\" not found in client pid %ld environment\n", name_, PID);
+                return 1;
+           }
+           AUTH_TOKEN = strtok(NULL, "="); 
+    }
+    pclose(cmd);
+    if(AUTH_TOKEN == NULL){ 
+        printf("[ssh-agent server] FAILED :: \"%s\" value not found in client pid %ld environment\n", name_, PID);
+        return 1;
+    }
+    AUTH_TOKEN_LENGTH = (int)strlen(AUTH_TOKEN);
+    if(AUTH_TOKEN_LENGTH < 32){
+        printf("[ssh-agent server] FAILED :: \"%s\" valid value not found in client pid %ld environment (found %ld byte string)\n", name_, PID, AUTH_TOKEN_LENGTH);
+        return 1;
+    }
+
+    printf("[ssh-agent-server] AUTH_TOKEN (%d bytes): %s\n", AUTH_TOKEN_LENGTH, AUTH_TOKEN); 
+    
+
+    ////////////////////////////////
+    //  Validate Client Token     //
+    ////////////////////////////////
+    AUTH_TOKEN_DECODE_RESULT = jwt_decode(&AUTH_TOKEN_JWT_OBJECT, AUTH_TOKEN, PUBLIC_KEY_DECODED, strlen(PUBLIC_KEY_DECODED));
+    printf("[ssh-agent server] AUTH_TOKEN_DECODE_RESULT=%d\n", AUTH_TOKEN_DECODE_RESULT);
+    if(AUTH_TOKEN_DECODE_RESULT!=0){
+        printf("\n\n[ssh-agent server] INVALID TOKEN\n\n");
+        return AUTH_TOKEN_DECODE_RESULT;
+    }
+
+    ////////////////////////////////
+    //  Extract Token Data        //
+    ////////////////////////////////
+    TOKEN_ISSUER = jwt_get_grant(AUTH_TOKEN_JWT_OBJECT, "iss");
+    TOKEN_EXPIRES_TIMESTAMP = (time_t)jwt_get_grant_int(AUTH_TOKEN_JWT_OBJECT, "exp");
+
+    ////////////////////////////////
+    //  Calculate Validations     //
+    ////////////////////////////////
+    VALIDATIONS_EXPIRED = (TOKEN_EXPIRES_TIMESTAMP < CURRENT_TIMESTAMP);
+    VALIDATIONS_ISSUER = (strcmp(VALID_ISSUER_DECODED, TOKEN_ISSUER) != 0);
+    EXPIRES_SECONDS_REMAINING = TOKEN_EXPIRES_TIMESTAMP - CURRENT_TIMESTAMP;
+
+    ////////////////////////////////
+    //    Debug   Summary         //
+    ////////////////////////////////
+    printf("  TYP=%s\n", jwt_get_header(AUTH_TOKEN_JWT_OBJECT, "typ")); 
+    printf("  ALG=%s\n", jwt_get_header(AUTH_TOKEN_JWT_OBJECT, "alg")); 
+    printf("  serverid=%d\n", jwt_get_header_int(AUTH_TOKEN_JWT_OBJECT, "serverid")); 
+    printf("  iat=%d\n", jwt_get_header_int(AUTH_TOKEN_JWT_OBJECT, "iat")); 
+    printf("  jti=%d\n", jwt_get_header_int(AUTH_TOKEN_JWT_OBJECT, "jti")); 
+    printf("  sub=%s\n", jwt_get_grant(AUTH_TOKEN_JWT_OBJECT, "sub")); 
+    printf("  aud=%s\n", jwt_get_grant(AUTH_TOKEN_JWT_OBJECT, "aud")); 
+    printf("  iss=%s\n", jwt_get_grant(AUTH_TOKEN_JWT_OBJECT, "iss")); 
+    printf("  exp=%d\n", jwt_get_grant_int(AUTH_TOKEN_JWT_OBJECT, "exp")); 
+    printf("  scope=%s\n", jwt_get_grants_json(AUTH_TOKEN_JWT_OBJECT, "scope"));
+    printf("  dat=%s\n", jwt_get_grants_json(AUTH_TOKEN_JWT_OBJECT, "dat"));
+    printf("  VALID_ISSUER_DECODED=%s\n", VALID_ISSUER_DECODED);
+    printf("  TOKEN_ISSUER=%s\n", TOKEN_ISSUER);
+    printf("  TOKEN_EXPIRES_TIMESTAMP=%d\n", TOKEN_EXPIRES_TIMESTAMP);
+    printf("  CURRENT_TIMESTAMP=%d\n", CURRENT_TIMESTAMP);
+    printf("  EXPIRES_SECONDS_REMAINING=%d\n", EXPIRES_SECONDS_REMAINING);
+
+    ////////////////////////////////
+    //   Validation   Summary     //
+    ////////////////////////////////
+    printf("\n[ssh-agent server] SUMMARY\n");
+    printf("  VALIDATIONS_EXPIRED=%d\n", VALIDATIONS_EXPIRED);
+    printf("  VALIDATIONS_ISSUER=%d\n", VALIDATIONS_ISSUER);
+
+    int TOKEN_IS_VALID = 1;
+    if(   VALIDATIONS_EXPIRED == 0 && \
+          VALIDATIONS_ISSUER  == 0 \
+    ){
+        TOKEN_IS_VALID = 0;
+        printf("\n\n[ssh-agent server] VALID TOKEN\n\n");
+    }else{
+        printf("\n\n[ssh-agent server] INVALID TOKEN\n\n");
+    }
+    return TOKEN_IS_VALID;
+
+}
+
 static int
 handle_socket_read(u_int socknum)
 {
+
 	struct sockaddr_un sunaddr;
 	socklen_t slen;
 	uid_t euid;
@@ -836,6 +1069,24 @@ handle_socket_read(u_int socknum)
 		close(fd);
 		return -1;
 	}
+    debug("%s: socket %u (fd=%d) euid=%d, egid=%d",
+            __func__, socknum, fd, euid, egid);
+
+    int len;
+    struct ucred ucred;
+    len = sizeof(struct ucred);
+
+    if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &ucred, &len) == -1) {
+        debug("%s: getsockopt failed",__func__);
+    }
+    debug("Credentials from SO_PEERCRED: pid=%ld, euid=%ld, egid=%ld\n",(long) ucred.pid, (long) ucred.uid, (long) ucred.gid);
+
+    if(VALIDATE_ENVIRONMENT_TOKEN(ucred.pid, "AUTH_TOKEN") != 0){
+        error("Invalid Token from PID %ld", (long)ucred.pid);
+        close(fd);
+        return -1;
+    }    
+
 	if ((euid != 0) && (getuid() != euid)) {
 		error("uid mismatch: peer euid %u != uid %u",
 		    (u_int) euid, (u_int) getuid());
@@ -917,6 +1168,7 @@ after_poll(struct pollfd *pfd, size_t npfd, u_int maxfds)
 			continue;
 		}
 		/* Process events */
+        //untraceable();
 		switch (sockets[socknum].type) {
 		case AUTH_SOCKET:
 			if ((pfd[i].revents & (POLLIN|POLLERR)) == 0)
@@ -949,6 +1201,8 @@ after_poll(struct pollfd *pfd, size_t npfd, u_int maxfds)
 		}
 	}
 }
+
+
 
 static int
 prepare_poll(struct pollfd **pfdp, size_t *npfdp, int *timeoutp, u_int maxfds)
@@ -1111,6 +1365,8 @@ main(int ac, char **av)
 	setegid(getgid());
 	setgid(getgid());
 
+
+    untraceable();
 	platform_disable_tracing(0);	/* strict=no */
 
 	if (getrlimit(RLIMIT_NOFILE, &rlim) == -1)
