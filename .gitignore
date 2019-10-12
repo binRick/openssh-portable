@@ -40,3 +40,4 @@ config.log
 pubkey.pem
 test_key*
 findssl.log
+EasyRSA-unix-v3.0.6.tgz
