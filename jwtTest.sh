@@ -20,7 +20,6 @@ set +e && (./_jwtTest.py --test | grep OK) >/dev/null 2>&1 || {
 }
 
 set -e
-
 rm -rf test_socket
 
 coproc sshAddProc { LD_LIBRARY_PATH=. \
@@ -29,7 +28,6 @@ coproc sshAddProc { LD_LIBRARY_PATH=. \
     exec ./ssh-agent -Dsa test_socket; }
 
 echo Spawned PID $sshAddProc_PID
-
 
 if [ -e test_key ]; then unlink test_key; fi
 if [ -e test_key.pub ]; then unlink test_key.pub; fi
