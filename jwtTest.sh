@@ -22,10 +22,18 @@ set +e && (./_jwtTest.py --test | grep OK) >/dev/null 2>&1 || {
 set -e
 rm -rf test_socket
 
-coproc sshAddProc { LD_LIBRARY_PATH=. \
-    ISSUER="$(echo -n $(hostname -f)|base64 -w 0)" \
-    PUBLIC_KEY="$(cat pki/issued/server.pub|base64 -w0)" \
-    exec ./ssh-agent -Dsa test_socket; }
+ADD_PROC_CMD="LD_LIBRARY_PATH=. \
+    ISSUER=\"$(echo -n $(hostname -f)|base64 -w 0)\" \
+    PUBLIC_KEY=\"$(cat pki/issued/server.pub|base64 -w0)\" \
+    exec ./ssh-agent -Dsa test_socket;"
+
+
+echo Executing CoProcess
+echo
+echo $ADD_PROC_CMD
+echo
+eval coproc sshAddProc { $ADD_PROC_CMD }
+
 
 echo Spawned PID $sshAddProc_PID
 
