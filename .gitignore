@@ -34,3 +34,5 @@ libjwt.so
 pub.key
 test_key
 test_key.pub
+pki
+config.log

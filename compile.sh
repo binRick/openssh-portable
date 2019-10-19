@@ -121,6 +121,9 @@ echo -e "\n\n"
 
 
 
+echo Building PKI
+
+./buildPki.sh
 
 
 
