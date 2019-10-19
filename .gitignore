@@ -27,3 +27,10 @@ ssh-pkcs11-helper
 sshd
 !regress/misc/fuzz-harness/Makefile
 tags
+cert.pem
+jwt.h
+key.pem
+libjwt.so
+pub.key
+test_key
+test_key.pub
