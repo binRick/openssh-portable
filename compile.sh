@@ -3,10 +3,11 @@ cd $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 origDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 set -e
 
-sudo yum -y install openssl-devel jansson-devel mariadb-server
+#sudo yum -y install openssl-devel jansson-devel mariadb-server
 
 #  LIBJWT
-if [ ! -e libjwt.so.0 ]; then
+if [ ! -e libjwt.a; then
+#if [ ! -e libjwt.so.0 ]; then
     JWTPATH=~/.libjwt
     rm -rf $JWTPATH
     git clone ssh://git@github.com/benmcollins/libjwt $JWTPATH
@@ -18,8 +19,11 @@ if [ ! -e libjwt.so.0 ]; then
     if [ -e libjwt.so.0 ]; then unlink libjwt.so.0; fi
     #cp ./libjwt/.libs/libjwt.a $origDir/.
     cp ./libjwt/.libs/libjwt.so $origDir/.
-    cp ./libjwt/.libs/libjwt.so.0 $origDir/.
+#    cp ./libjwt/.libs/libjwt.so.0 $origDir/.
     cp ./include/jwt.h $origDir/.
+    ar -rc libjwt.a libjwt.so
+    rm libjwt.so 
+#    rm libjwt.so.0
 
     cd $origDir
 fi
