@@ -38,3 +38,4 @@ pki
 config.log
 *.swp
 pubkey.pem
+test_key*
