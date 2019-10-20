@@ -6,7 +6,6 @@ EASYRSA="/usr/share/easy-rsa/3.0.6/easyrsa"
 INTERFACE="$(route -n| grep ^0.0.0.0|tr -s ' '|cut -d' ' -f8|grep '^[a-z].*[0-9]$')"
 IP="$(ifconfig $INTERFACE | grep inet| tr -s ' '| cut -d' ' -f3|grep '^[0-9].*[0-9]$')"
 
-
 if [ ! -x "$EASYRSA" ]; then
 	echo "easy-rsa required ($EASYRSA)"
 	exit 1
@@ -34,8 +33,13 @@ $EASYRSA \
 	gen-crl
 
 
+cat pki/private/server.key pki/issued/server.crt > server.pem
+openssl rsa -in server.pem -pubout -out pki/issued/server.pub
+rm server.pem
+
 ls -al \
 	pki/issued/server.crt \
+	pki/issued/server.pub \
 	pki/private/server.key \
 	pki/private/ca.key \
 	pki/crl.pem

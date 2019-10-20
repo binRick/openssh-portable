@@ -37,3 +37,4 @@ test_key.pub
 pki
 config.log
 *.swp
+pubkey.pem
