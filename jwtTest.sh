@@ -1,9 +1,17 @@
 #!/bin/bash
-set -e
 _VENV_PATH=~/.jwtVenv
-rm -rf $_VENV_PATH
-python3 -m venv $_VENV_PATH
-source $_VENV_PATH/bin/activate
-pip install python-jose --upgrade
+set -e
+if [ ! -d "$_VENV_PATH" ]; then
+	python3 -m venv $_VENV_PATH;
+fi
+source $_VENV_PATH/bin/activate;
 
-exec ./_jwtTest.py
+set +e && ./_jwtTest.py --test | grep OK >/dev/null 2>&1 || { 
+	rm -rf $_VENV_PATH;
+	python3 -m venv $_VENV_PATH;
+	source $_VENV_PATH/bin/activate;
+	pip install python-jose pycrypto;
+}
+
+set -e
+exec ./_jwtTest.py $@

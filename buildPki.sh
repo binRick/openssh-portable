@@ -31,10 +31,6 @@ $EASYRSA \
 
 $EASYRSA \
 	--batch \
-	gen-dh nopass
-
-$EASYRSA \
-	--batch \
 	gen-crl
 
 
@@ -42,8 +38,10 @@ ls -al \
 	pki/issued/server.crt \
 	pki/private/server.key \
 	pki/private/ca.key \
-	pki/crl.pem \
-	pki/dh.pem
+	pki/crl.pem
+
+
+ 
 
 
 
