@@ -1,6 +1,10 @@
 #!/bin/bash
 _VENV_PATH=~/.jwtVenv
+export PRIV_KEY_FILE=pki/private/server.key
 set -e
+if [ ! -f "$PRIV_KEY_FILE" ]; then
+	./buildPki.sh
+fi
 if [ ! -d "$_VENV_PATH" ]; then
 	python3 -m venv $_VENV_PATH;
 fi
