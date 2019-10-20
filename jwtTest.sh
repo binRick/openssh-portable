@@ -10,7 +10,7 @@ if [ ! -d "$_VENV_PATH" ]; then
 fi
 source $_VENV_PATH/bin/activate;
 
-set +e && ./_jwtTest.py --test | grep OK >/dev/null 2>&1 || { 
+set +e && (./_jwtTest.py --test | grep OK) >/dev/null 2>&1 || { 
 	rm -rf $_VENV_PATH;
 	python3 -m venv $_VENV_PATH;
 	source $_VENV_PATH/bin/activate;
