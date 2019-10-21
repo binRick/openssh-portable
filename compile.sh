@@ -108,9 +108,7 @@ kill $sshAddProc_PID
 rm -rf test_socket
 
 
-#set +e
-#if [ -e test_socket ]; then unlink test_socket; fi
-#set -e
+set -e
 
 echo -e "\n\n"
 echo OK
@@ -119,13 +117,11 @@ echo -e "\n\n"
 
 
 
+#echo Building PKI
+#./buildPki.sh
 
-
-echo Building PKI
-
-./buildPki.sh
-
-
+#echo Testing JWT Token
+#./jwtTest.sh
 
 
 
