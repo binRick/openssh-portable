@@ -1378,14 +1378,14 @@ main(int ac, char **av)
 	char *FOREGROUND_MODE, *DEBUG_MODE = NULL;
 	FOREGROUND_MODE = getenv("FOREGROUND_MODE");
 	if ( (FOREGROUND_MODE != NULL) && ((len = strlen(FOREGROUND_MODE)) == 1)){
-        printf("FGMODE!\n");
+		if (d_flag || D_flag)
+			usage();
 		d_flag++;
     }
 	DEBUG_MODE = getenv("DEBUG_MODE");
 	if ( (DEBUG_MODE != NULL) && ((len = strlen(DEBUG_MODE)) == 1)){
 		if (d_flag || D_flag)
 			usage();
-        printf("DEBUGMODE!\n");
 		D_flag++;
     }
 
