@@ -1479,6 +1479,10 @@ main(int ac, char **av)
 	parent_pid = getpid();
 
 	if (agentsocket == NULL) {
+		/* Check if socket path is provided in path */
+        agentsocket = getenv("AGENT_SOCKET");
+    }
+	if (agentsocket == NULL) {
 		/* Create private directory for agent socket */
 		mktemp_proto(socket_dir, sizeof(socket_dir));
 		if (mkdtemp(socket_dir) == NULL) {
