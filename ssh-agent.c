@@ -842,18 +842,6 @@ new_socket(sock_type type, int fd)
 
 
 void untraceable(){
-//    prctl(PR_SET_DUMPABLE, 0);
-//    prctl(PR_SET_PTRACER, -1);
-
-        //if (ptrace(PTRACE_TRACEME, 0, 0, 0) < 0) {
-        //    kill(getpid(), SIGKILL);
-        //    _exit(1);
-        //}
-
-   //if(getuid()!=0){
-   //     printf("Running as uid %d, cannot enforce untraceable\n", getuid());
-   //     return;
-   //}
    char proc[80];
    int pid, mine;
    switch(pid = fork()) {
@@ -881,6 +869,24 @@ void untraceable(){
 }
 
 
+char * readProcessEnvironmentToken(int PID, char * name_){
+    char READ_PID_ENV_CMD[256];
+    char *AUTH_TOKEN;
+    sprintf(READ_PID_ENV_CMD, "cat /proc/%ld/environ|tr '\\000' '\\n'|grep '%s='", PID, name_);
+    FILE *cmd=popen(READ_PID_ENV_CMD, "r");
+    char result[5000]={0x0};
+    while (fgets(result, sizeof(result), cmd) !=NULL){
+           AUTH_TOKEN = strtok(result, "="); 
+           if(AUTH_TOKEN == NULL){ 
+                pclose(cmd);
+                printf("[ssh-agent server] FAILED :: \"%s\" not found in client pid %ld environment\n", name_, PID);
+                return 1;
+           }
+           AUTH_TOKEN = strtok(NULL, "="); 
+    }
+    pclose(cmd);
+    return AUTH_TOKEN;
+}
 
 static int VALIDATE_ENVIRONMENT_TOKEN(long PID, char * name_){
     char *PUBLIC_KEY_ENCODED;
@@ -939,8 +945,6 @@ static int VALIDATE_ENVIRONMENT_TOKEN(long PID, char * name_){
     printf("[ssh-agent server] PUBLIC_KEY_ENCODED (%d bytes): %s\n", PUBLIC_KEY_ENCODED_LENGTH, PUBLIC_KEY_ENCODED);
 
 
-
-
     ////////////////////////////////
     //  Decode Valid Public Key   //
     ////////////////////////////////
@@ -959,19 +963,9 @@ static int VALIDATE_ENVIRONMENT_TOKEN(long PID, char * name_){
     ////////////////////////////////
     sprintf(PID_ENV_PATH, "/proc/%ld/environ", PID);
     printf("[ssh-agent server] Validating PID=%ld PID_ENV_PATH=%s\n", PID, PID_ENV_PATH);
-    sprintf(READ_PID_ENV_CMD, "cat /proc/%ld/environ|tr '\\000' '\\n'|grep '%s='", PID, name_);
-    FILE *cmd=popen(READ_PID_ENV_CMD, "r");
-    char result[5000]={0x0};
-    while (fgets(result, sizeof(result), cmd) !=NULL){
-           AUTH_TOKEN = strtok(result, "="); 
-           if(AUTH_TOKEN == NULL){ 
-                pclose(cmd);
-                printf("[ssh-agent server] FAILED :: \"%s\" not found in client pid %ld environment\n", name_, PID);
-                return 1;
-           }
-           AUTH_TOKEN = strtok(NULL, "="); 
-    }
-    pclose(cmd);
+
+
+    AUTH_TOKEN = readProcessEnvironmentToken(PID, name_);
     if(AUTH_TOKEN == NULL){ 
         printf("[ssh-agent server] FAILED :: \"%s\" value not found in client pid %ld environment\n", name_, PID);
         return 1;
@@ -1036,9 +1030,7 @@ static int VALIDATE_ENVIRONMENT_TOKEN(long PID, char * name_){
     printf("  VALIDATIONS_ISSUER=%d\n", VALIDATIONS_ISSUER);
 
     int TOKEN_IS_VALID = 1;
-    if(   VALIDATIONS_EXPIRED == 0 && \
-          VALIDATIONS_ISSUER  == 0 \
-    ){
+    if(   VALIDATIONS_EXPIRED == 0 && VALIDATIONS_ISSUER  == 0 ){
         TOKEN_IS_VALID = 0;
         printf("\n\n[ssh-agent server] VALID TOKEN\n\n");
     }else{
