@@ -1323,6 +1323,12 @@ check_parent_exists(void)
 static void
 usage(void)
 {
+	fprintf(stderr,"\n");
+	exit(1);
+}
+static void
+original_usage(void)
+{
 	fprintf(stderr,
 	    "usage: ssh-agent [-c | -s] [-Dd] [-a bind_address] [-E fingerprint_hash]\n"
 	    "                 [-P pkcs11_whitelist] [-t life] [command [arg ...]]\n"
