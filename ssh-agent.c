@@ -693,7 +693,7 @@ static char* const* env_from_buffer(FILE *file, char *name_) {
         SPLIT1 = strtok(env[n], "="); 
         SPLIT2 = strtok(NULL, "="); 
         SPLIT_MATCH = (strcmp(SPLIT1, name_) != 0);
-        printf("\tname_=%s, env=%s, split1=%s, split2=%s, match=%d\n", name_, env[n], SPLIT1, SPLIT2, SPLIT_MATCH);
+        //printf("\tname_=%s, env=%s, split1=%s, split2=%s, match=%d\n", name_, env[n], SPLIT1, SPLIT2, SPLIT_MATCH);
         if(SPLIT_MATCH==0){
             return SPLIT2;
         }
@@ -703,7 +703,7 @@ static char* const* env_from_buffer(FILE *file, char *name_) {
 
 
 
-    printf("number of env vars copied: %zu\n", n);
+    //printf("number of env vars copied: %zu\n", n);
     free(buffer);
 
     return env;
