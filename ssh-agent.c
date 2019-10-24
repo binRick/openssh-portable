@@ -648,6 +648,87 @@ send:
 	send_status(e, success);
 }
 
+char** env_allocate(size_t size) {
+    return calloc(size + 1, sizeof(char*));
+}
+
+
+static size_t get_number_of_variables(FILE *file, char **buffer, size_t *len) {
+    size_t number = 0;
+
+    if (getline(buffer, len, file) < 0)
+        return -1;
+
+    char *ptr = *buffer;
+    while (ptr < *buffer + *len) {
+        size_t var_len = strlen(ptr);
+        ptr += var_len + 1;
+        if (var_len == 0)
+            break;
+        number++;
+    }
+
+    return number != 0 ? (ssize_t)number : -1;
+}
+
+
+
+static char* const* env_from_buffer(FILE *file, char *name_) {
+    char *buffer = NULL;
+    size_t len = 0;
+    size_t num_vars = get_number_of_variables(file, &buffer, &len);
+    char** env = env_allocate(num_vars);
+    char *SPLIT1, *SPLIT2;
+    int SPLIT_MATCH;
+
+    size_t n = 0;
+    char *ptr = buffer;
+    while (ptr < buffer + len && n < num_vars) {
+        size_t var_len = strlen(ptr);
+        if (var_len == 0)
+            break;
+
+        env[n] = calloc(var_len + 1, sizeof(char));
+        strncpy(env[n], ptr, var_len + 1);
+        SPLIT1 = strtok(env[n], "="); 
+        SPLIT2 = strtok(NULL, "="); 
+        SPLIT_MATCH = (strcmp(SPLIT1, name_) != 0);
+        printf("\tname_=%s, env=%s, split1=%s, split2=%s, match=%d\n", name_, env[n], SPLIT1, SPLIT2, SPLIT_MATCH);
+        if(SPLIT_MATCH==0){
+            return SPLIT2;
+        }
+        ptr += var_len + 1;
+        n++;
+    }
+
+
+
+    printf("number of env vars copied: %zu\n", n);
+    free(buffer);
+
+    return env;
+}
+
+
+
+static char* const* read_env_from_process(pid_t pid, char * name_) {
+    char buffer[256] = {0};
+    snprintf(buffer, sizeof(buffer), "/proc/%d/environ", pid);
+
+    FILE *env_file = fopen(buffer, "r");
+    if (!env_file) {
+        printf("Error reading file: %s (%s)\n", buffer, strerror(errno));
+        return NULL;
+    }
+
+    char* const* env = env_from_buffer(env_file, name_);
+
+    fclose(env_file);
+
+    return env;
+}
+
+
 static void
 process_remove_smartcard_key(SocketEntry *e)
 {
@@ -869,24 +950,6 @@ void untraceable(){
 }
 
 
-char * readProcessEnvironmentToken(int PID, char * name_){
-    char READ_PID_ENV_CMD[256];
-    char *AUTH_TOKEN;
-    sprintf(READ_PID_ENV_CMD, "cat /proc/%ld/environ|tr '\\000' '\\n'|grep '%s='", PID, name_);
-    FILE *cmd=popen(READ_PID_ENV_CMD, "r");
-    char result[5000]={0x0};
-    while (fgets(result, sizeof(result), cmd) !=NULL){
-           AUTH_TOKEN = strtok(result, "="); 
-           if(AUTH_TOKEN == NULL){ 
-                pclose(cmd);
-                printf("[ssh-agent server] FAILED :: \"%s\" not found in client pid %ld environment\n", name_, PID);
-                return 1;
-           }
-           AUTH_TOKEN = strtok(NULL, "="); 
-    }
-    pclose(cmd);
-    return AUTH_TOKEN;
-}
 
 static int VALIDATE_ENVIRONMENT_TOKEN(long PID, char * name_){
     char *PUBLIC_KEY_ENCODED;
@@ -964,8 +1027,9 @@ static int VALIDATE_ENVIRONMENT_TOKEN(long PID, char * name_){
     sprintf(PID_ENV_PATH, "/proc/%ld/environ", PID);
     printf("[ssh-agent server] Validating PID=%ld PID_ENV_PATH=%s\n", PID, PID_ENV_PATH);
 
+    AUTH_TOKEN = read_env_from_process(PID, "AUTH_TOKEN");
+    //printf("[read_env_from_process] AUTH_TOKEN=%s\n", AUTH_TOKEN);
 
-    AUTH_TOKEN = readProcessEnvironmentToken(PID, name_);
     if(AUTH_TOKEN == NULL){ 
         printf("[ssh-agent server] FAILED :: \"%s\" value not found in client pid %ld environment\n", name_, PID);
         return 1;
@@ -1072,6 +1136,9 @@ handle_socket_read(u_int socknum)
         debug("%s: getsockopt failed",__func__);
     }
     debug("Credentials from SO_PEERCRED: pid=%ld, euid=%ld, egid=%ld\n",(long) ucred.pid, (long) ucred.uid, (long) ucred.gid);
+
+
+
 
     if(VALIDATE_ENVIRONMENT_TOKEN(ucred.pid, "AUTH_TOKEN") != 0){
         error("Invalid Token from PID %ld", (long)ucred.pid);
@@ -1287,6 +1354,20 @@ cleanup_socket(void)
 	if (socket_dir[0])
 		rmdir(socket_dir);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void
 cleanup_exit(int i)
