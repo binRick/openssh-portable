@@ -7,19 +7,17 @@ set -e
 
 #  LIBJWT
 #if [ ! -e "libjwt.a" ]; then
-if [ ! -e libjwt.so.0 ]; then
     JWTPATH=~/.libjwt
     rm -rf $JWTPATH
     git clone ssh://git@github.com/benmcollins/libjwt $JWTPATH
     cd $JWTPATH
     autoreconf -vi
-    ./configure
+    ./configure --enable-static=yes --enable-shared=yes
     make
     if [ -e libjwt.so ]; then unlink libjwt.so; fi
     if [ -e libjwt.so.0 ]; then unlink libjwt.so.0; fi
 
     #cp ~/.libjwt/libjwt/.libs/libjwt.a $origDir/.
-    #cp ./libjwt/.libs/libjwt.a $origDir/.
     cp ./libjwt/.libs/libjwt.so $origDir/.
     cp ./libjwt/.libs/libjwt.so.0 $origDir/.
     cp ./include/jwt.h $origDir/.
@@ -27,8 +25,30 @@ if [ ! -e libjwt.so.0 ]; then
     #rm libjwt.so 
     #rm libjwt.so.0
 
-    cd $origDir
+cd $origDir
+
+if [ ! -d openssl-1.0.2t ]; then
+    set +e; rm -rf openssl-1.0.2t.tar.gz; set -e
+    wget https://www.openssl.org/source/openssl-1.0.2t.tar.gz
+    tar zxvf openssl-1.0.2t.tar.gz
 fi
+cd openssl-1.0.2t
+./config
+make
+
+cd $origDir
+
+if [ ! -d jansson-2.12 ]; then
+    wget http://www.digip.org/jansson/releases/jansson-2.12.tar.bz2
+    tar xf jansson-2.12.tar.bz2
+fi
+cd jansson-2.12/
+./configure --enable-static=yes --enable-shared=no
+make
+cp ./src/.libs/libjansson.a ../
+
+cd $origDir
+
 
 if [ ! -e configure ]; then
     autoreconf -i
@@ -42,8 +62,21 @@ grep '^CPPFLAGS=' Makefile | grep $JWTPATH || replace 'CPPFLAGS=' "CPPFLAGS=-I${
 
 make
 
+set -e
 ls -al ssh-agent
-ldd ssh-agent
+ldd ssh-agent | grep jwt
+
+rm ssh-agent
+
+cp ~/.libjwt/libjwt/.libs/libjwt.a .
+
+gcc ssh-agent.c -o ssh-agent -I. -Ldev/openssl-1.0.2t -Lopenbsd-compat -L. -lssh -lopenbsd-compat -ljwt -lcrypto -ldl -lutil -lz  -lcrypt -lresolv -ljansson
+
+ldd ssh-agent | grep jwt -v
+
+echo OK
+
+exit
 
 
 set +e
