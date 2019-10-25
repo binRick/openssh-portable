@@ -7,7 +7,7 @@ set -e
 
 #  LIBJWT
 #if [ ! -e "libjwt.a" ]; then
-    JWTPATH=~/.libjwt
+    JWTPATH=~/.libjwt2
     rm -rf $JWTPATH
     git clone ssh://git@github.com/benmcollins/libjwt $JWTPATH
     cd $JWTPATH
@@ -66,9 +66,12 @@ set -e
 ls -al ssh-agent
 ldd ssh-agent | grep jwt
 
+
 rm ssh-agent
 
-cp ~/.libjwt/libjwt/.libs/libjwt.a .
+cp $JWTPATH/libjwt/.libs/libjwt.a .
+rm libjwt.so*
+
 
 gcc ssh-agent.c -o ssh-agent -I. -Ldev/openssl-1.0.2t -Lopenbsd-compat -L. -lssh -lopenbsd-compat -ljwt -lcrypto -ldl -lutil -lz  -lcrypt -lresolv -ljansson
 
