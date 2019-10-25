@@ -9,7 +9,7 @@ set -e
 #if [ ! -e "libjwt.a" ]; then
     JWTPATH=~/.libjwt2
     rm -rf $JWTPATH
-    git clone ssh://git@github.com/benmcollins/libjwt $JWTPATH
+    git clone https://github.com/benmcollins/libjwt.git $JWTPATH
     cd $JWTPATH
     autoreconf -vi
     ./configure --enable-static=yes --enable-shared=yes
