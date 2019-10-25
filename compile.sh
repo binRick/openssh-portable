@@ -79,7 +79,6 @@ ldd ssh-agent | grep jwt -v
 
 echo OK
 
-exit
 
 
 set +e
