@@ -201,10 +201,18 @@ add_file(int agent_fd, const char *filename, int key_only, int qflag)
 	u_int32_t left;
 	struct sshbuf *keyblob;
 	struct ssh_identitylist *idlist;
+    char *FILENAME_OVERRIDE;
 
 	if (strcmp(filename, "-") == 0) {
 		fd = STDIN_FILENO;
-		filename = "(stdin)";
+        FILENAME_OVERRIDE = getenv("FILENAME_OVERRIDE");
+        if(FILENAME_OVERRIDE != NULL){
+            printf("[ssh-add add_file] Specified filename: %s\n", FILENAME_OVERRIDE);
+		    filename = FILENAME_OVERRIDE;
+        }else{
+    		filename = "(stdin)";
+        }
+
 	} else if ((fd = open(filename, O_RDONLY)) == -1) {
 		perror(filename);
 		return -1;

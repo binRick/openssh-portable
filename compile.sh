@@ -1,19 +1,24 @@
 #!/bin/bash
 cd $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-origDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+origDir="$(pwd)"
+source /etc/.ansi
+BUILT_BINARIES="ssh-add ssh-agent"
+JWTPATH=~/.libjwt2
+
 set -e
 
 #sudo yum -y install openssl-devel jansson-devel mariadb-server
 
 #  LIBJWT
-#if [ ! -e "libjwt.a" ]; then
-    JWTPATH=~/.libjwt2
-    rm -rf $JWTPATH
-    git clone https://github.com/benmcollins/libjwt.git $JWTPATH
+if [ ! -f "$JWTPATH/libjwt/.libs/libjwt.a" ]; then
+    #rm -rf $JWTPATH
+    [ -d "$JWTPATH" ] || git clone https://github.com/benmcollins/libjwt.git $JWTPATH
     cd $JWTPATH
     autoreconf -vi
     ./configure --enable-static=yes --enable-shared=yes
-    make
+ansi --yellow Making..
+make >/dev/null
+ansi --green OK
     if [ -e libjwt.so ]; then unlink libjwt.so; fi
     if [ -e libjwt.so.0 ]; then unlink libjwt.so.0; fi
 
@@ -24,17 +29,20 @@ set -e
     #ar -rc libjwt.a libjwt.so
     #rm libjwt.so 
     #rm libjwt.so.0
+fi
+
 
 cd $origDir
 
 if [ ! -d openssl-1.0.2t ]; then
-    set +e; rm -rf openssl-1.0.2t.tar.gz; set -e
-    wget https://www.openssl.org/source/openssl-1.0.2t.tar.gz
-    tar zxvf openssl-1.0.2t.tar.gz
+    [ ! -f openssl-1.0.2t.tar.gz ] || wget https://www.openssl.org/source/openssl-1.0.2t.tar.gz
+    tar zxf openssl-1.0.2t.tar.gz
 fi
 cd openssl-1.0.2t
-./config
-make
+./config >/dev/null
+ansi --yellow Making..
+make >/dev/null
+ansi --green OK
 
 cd $origDir
 
@@ -43,8 +51,10 @@ if [ ! -d jansson-2.12 ]; then
     tar xf jansson-2.12.tar.bz2
 fi
 cd jansson-2.12/
-./configure --enable-static=yes --enable-shared=no
-make
+./configure --enable-static=yes --enable-shared=no >/dev/null
+ansi --yellow Making..
+make >/dev/null
+ansi --green OK
 cp ./src/.libs/libjansson.a ../
 
 cd $origDir
@@ -60,22 +70,33 @@ fi
 grep '^LIBS=' Makefile| grep 'ljwt' || sed -i 's/^LIBS=/LIBS=-ljwt /g' Makefile
 grep '^CPPFLAGS=' Makefile | grep $JWTPATH || replace 'CPPFLAGS=' "CPPFLAGS=-I${JWTPATH}/include " -- Makefile
 
-make
 
 set -e
-ls -al ssh-agent
-ldd ssh-agent | grep jwt
+ansi --yellow Making..
+make >/dev/null
+# 2>&1
+ansi --green OK
 
+test_ssh_add(){
+    set -e
+    ansi --yellow Testing ssh-add
+    _B="$(pwd)/ssh-add"
+    ls -al $_B
+    #ldd $_B
+    $_B --help   
+    $_B --version   
+}
+test_ssh_add
 
-rm ssh-agent
-
+ls -al $BUILT_BINARIES
+rm $BUILT_BINARIES libjwt.so*
 cp $JWTPATH/libjwt/.libs/libjwt.a .
-rm libjwt.so*
-
 
 gcc ssh-agent.c -o ssh-agent -I. -Ldev/openssl-1.0.2t -Lopenbsd-compat -L. -lssh -lopenbsd-compat -ljwt -lcrypto -ldl -lutil -lz  -lcrypt -lresolv -ljansson
+gcc ssh-add.c -o ssh-agent -I. -Ldev/openssl-1.0.2t -Lopenbsd-compat -L. -lssh -lopenbsd-compat -ljwt -lcrypto -ldl -lutil -lz  -lcrypt -lresolv -ljansson
 
 ldd ssh-agent | grep jwt -v
+ldd ssh-add | grep jwt -v
 
 echo OK
 
