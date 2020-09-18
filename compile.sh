@@ -10,7 +10,7 @@ sudo yum -y install openssl-devel jansson-devel mariadb-server openssl-devel wge
     sudo \
     cmake automake autoconf \
     rpm-build \
-    vim\*
+    vim-enhanced
 
 
 #  LIBJWT
