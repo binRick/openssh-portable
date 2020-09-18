@@ -5,11 +5,11 @@ source /etc/.ansi
 BUILT_BINARIES="ssh-add ssh-agent"
 JWTPATH=~/.libjwt2
 
-set +e
-sudo yum -y install openssl-devel jansson-devel mariadb-server openssl-devel glibc-commmon wget mariadb-server \
-    sudo
-
 set -e
+sudo yum -y install openssl-devel jansson-devel mariadb-server openssl-devel glibc-commmon wget mariadb-server \
+    sudo \
+    cmake automake autoconf
+
 
 #  LIBJWT
 if [ ! -f "$JWTPATH/libjwt/.libs/libjwt.a" ]; then
