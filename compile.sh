@@ -7,7 +7,7 @@ JWTPATH=~/.libjwt2
 
 set -e
 
-sudo yum -y install openssl-devel jansson-devel mariadb-server openssl-devel glibc-commmon
+sudo yum -y install openssl-devel jansson-devel mariadb-server openssl-devel glibc-commmon wget
 
 #  LIBJWT
 if [ ! -f "$JWTPATH/libjwt/.libs/libjwt.a" ]; then
