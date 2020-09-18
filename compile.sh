@@ -8,7 +8,8 @@ JWTPATH=~/.libjwt2
 set -e
 sudo yum -y install openssl-devel jansson-devel mariadb-server openssl-devel glibc-commmon wget mariadb-server \
     sudo \
-    cmake automake autoconf
+    cmake automake autoconf \
+    vim
 
 
 #  LIBJWT
